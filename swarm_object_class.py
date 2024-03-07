@@ -3,6 +3,7 @@ import logging
 import numpy
 
 from agent_class import Agent
+from flight_state_class import FlightState
 from typing import List, Union
 
 
@@ -47,26 +48,26 @@ class SwarmObject:
     def flight_sequence(self):
         if self.ready_to_fly:
             for agent in self.swarm_agent_list:
-                if agent.enabled and agent.state != 'Not flying':
-                    if agent.state == 'Standby':
+                if agent.enabled and not agent.state == FlightState.NOT_FLYING:
+                    if agent.state == FlightState.STANDBY:
                         self.standby_control_law(agent)
 
-                    if agent.state == 'Takeoff':
+                    if agent.state == FlightState.TAKEOFF:
                         self.takeoff_control_law(agent)
 
-                    if agent.state == 'Land':
+                    if agent.state == FlightState.LAND:
                         self.landing_control_law(agent)
 
-                    if agent.state == 'Manual':
+                    if agent.state == FlightState.MANUAL_FLIGHT:
                         self.manual_control_law(agent)
 
-                    if agent.state == 'xy_consensus':
+                    if agent.state == FlightState.XY_CONSENSUS:
                         self.xy_consensus_control_law(agent)
 
-                    if agent.state == 'z_consensus':
+                    if agent.state == FlightState.Z_CONSENSUS:
                         self.z_consensus_control_law(agent)
 
-                    if agent.state == 'Back_to_init':
+                    if agent.state == FlightState.BACK_TO_INIT:
                         self.back_to_initial_position_ctl_law(agent)
                 else:
                     agent.cf.commander.send_stop_setpoint()
@@ -137,7 +138,6 @@ class SwarmObject:
                       agent.position.z], agent.takeoff_position)
         if d <= self.distance_to_waypoint_threshold:
             logger.info(agent.name + ' takeoff completed')
-            agent.is_flying = True
             agent.standby()
             agent.standby_position[2] = agent.takeoff_height
 
@@ -156,7 +156,7 @@ class SwarmObject:
             self.remove_agent(agent)
 
     def xy_consensus_control_law(self, agent: Agent):
-        in_flight_agents = [agt for agt in self.swarm_agent_list if agt.state != 'Not flying']
+        in_flight_agents = [agt for agt in self.swarm_agent_list if agt.state != FlightState.NOT_FLYING]
         try:
             roll, pitch = consensus_control_law.xy_consensus_control_law(agent, in_flight_agents)
         except Exception as e:
@@ -166,7 +166,7 @@ class SwarmObject:
             return
 
         thrust = thrust_control_law(agent, agent.xy_consensus_z)
-        manual_agents = [agt for agt in in_flight_agents if agt.state == 'Manual']
+        manual_agents = [agt for agt in in_flight_agents if agt.state == FlightState.MANUAL_FLIGHT]
         if manual_agents:
             targeted_yaw = numpy.mean([agt.yaw for agt in manual_agents]) * numpy.pi / 180
         else:
@@ -180,7 +180,7 @@ class SwarmObject:
         agent.cf.commander.send_setpoint(roll, pitch, yaw_rate, thrust)
 
     def z_consensus_control_law(self, agent: Agent):
-        in_flight_agents = [agt for agt in self.swarm_agent_list if agt.state != 'Not flying']
+        in_flight_agents = [agt for agt in self.swarm_agent_list if agt.state != FlightState.NOT_FLYING]
         vx = agent.z_consensus_xy_position[0] - agent.position.x
         vy = agent.z_consensus_xy_position[1] - agent.position.y
         try:

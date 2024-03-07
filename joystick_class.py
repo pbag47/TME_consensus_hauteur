@@ -5,9 +5,11 @@ import os
 import struct
 
 from fcntl import ioctl
-from swarm_object_class import SwarmObject
 from threading import Thread
 from typing import Union
+
+from swarm_object_class import SwarmObject
+from flight_state_class import FlightState
 
 
 logger = logging.getLogger(__name__)
@@ -104,28 +106,30 @@ class Joystick:
         if button == 'Takeoff/Land' and value:
             logger.info('Takeoff / Land button triggered')
             for agt in self.swarm.swarm_agent_list:
-                if agt.enabled and not agt.is_flying:
+                if agt.enabled and agt.state == FlightState.NOT_FLYING:
                     agt.takeoff()
-                elif agt.enabled and agt.is_flying:
+                elif agt.enabled:
                     agt.land()
 
         if button == 'Standby' and value:
             logger.info('Standby button triggered')
             for agt in self.swarm.swarm_agent_list:
-                if agt.enabled and agt.is_flying:
+                if agt.enabled and not agt.state == FlightState.NOT_FLYING:
                     agt.standby()
 
         if button == 'Manual_flight' and value:
             logger.info('Manual flight button triggered')
-            if any([agt.state == 'Takeoff'
-                    or agt.state == 'Land' for agt in self.swarm.swarm_agent_list]):
+            if any([agt.state == FlightState.TAKEOFF
+                    or agt.state == FlightState.LAND for agt in self.swarm.swarm_agent_list]):
                 logger.warning('Manual control mode is prohibited while any UAV is in '
                                'Takeoff or Landing flight mode')
                 logger.error('Manual control command access denied')
             else:
                 for agt in self.swarm.swarm_agent_list:
-                    if agt.enabled and agt.is_flying and any([agt == manual for manual in
-                                                              self.swarm.manual_flight_agents_list]):
+                    if agt.enabled and \
+                            not agt.state == FlightState.NOT_FLYING and \
+                            any([agt == manual for manual in
+                                 self.swarm.manual_flight_agents_list]):
                         self.swarm.manual_z = agt.position.z
                         agt.manual_flight()
 
@@ -138,19 +142,19 @@ class Joystick:
         if button == 'Initial_position' and value:
             logger.info('Initial position button triggered')
             for agt in self.swarm.swarm_agent_list:
-                if agt.enabled and agt.is_flying:
+                if agt.enabled and not agt.state == FlightState.NOT_FLYING:
                     agt.back_to_initial_position()
 
         if button == 'z_consensus' and value:
             logger.info('z consensus button triggered')
             for agt in self.swarm.swarm_agent_list:
-                if agt.enabled and agt.is_flying:
+                if agt.enabled and not agt.state == FlightState.NOT_FLYING:
                     agt.z_consensus()
 
         if button == 'xy_consensus' and value:
             logger.info('xy consensus button triggered')
             for agt in self.swarm.swarm_agent_list:
-                if agt.enabled and agt.is_flying:
+                if agt.enabled and not agt.state == FlightState.NOT_FLYING:
                     agt.xy_consensus()
 
     def axis(self, axis, value):

@@ -8,6 +8,8 @@ from cflib.crazyflie import Crazyflie
 from qtm.packet import RT3DMarkerPositionNoLabel
 from typing import List, Union
 
+from flight_state_class import FlightState
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +49,7 @@ class Agent:
 
         # ---- Attributes initialization ---- #
         self.cf: Crazyflie = Crazyflie(rw_cache='./cache')
-        self.state: str = 'Not flying'
-        self.is_flying: bool = False
+        self.state: int = FlightState.NOT_FLYING
         self.enabled: bool = False
         self.battery_test_passed = False
         self.position_test_passed = False
@@ -181,7 +182,7 @@ class Agent:
             if self.position.z < self.z_boundaries[0] or self.position.z > self.z_boundaries[1]:
                 logger.error(self.name + ' outside boundaries on the z axis : ' + str(round(self.position.z, 2)) + ' m')
                 self.stop()
-            if round(data['pm.state']) == 3 and self.state != 'Land':
+            if round(data['pm.state']) == 3 and self.state != FlightState.LAND:
                 logger.error(self.name + ' low battery level, automatic landing triggered')
                 self.land()
 
@@ -197,8 +198,7 @@ class Agent:
                 self.log_config.stop()
             except AttributeError:
                 logger.info(self.name + ' unable to stop attitude logging')
-        self.state = 'Not flying'
-        self.is_flying = False
+        self.state = FlightState.NOT_FLYING
         self.enabled = False
         self.cf.commander.send_stop_setpoint()
 
@@ -248,42 +248,41 @@ class Agent:
 
     def standby(self):
         logger.info(self.name + ' Switch to Standby mode')
-        self.state = 'Standby'
+        self.state = FlightState.STANDBY
         self.standby_position = [self.position.x, self.position.y, self.position.z]
         self.standby_yaw = self.yaw
 
     def takeoff(self):
         logger.info(self.name + ' Switch to Takeoff mode')
-        self.state = 'Takeoff'
-        self.is_flying = True
+        self.state = FlightState.TAKEOFF
         self.takeoff_position = [self.position.x, self.position.y, self.takeoff_height]
         self.takeoff_yaw = self.yaw
 
     def land(self):
         logger.info(self.name + ' Switch to Landing mode')
-        self.state = 'Land'
+        self.state = FlightState.LAND
         self.land_position = [self.position.x, self.position.y, 0.0]
         self.land_yaw = self.yaw
 
     def manual_flight(self):
         logger.info(self.name + ' Switch to Manual flight mode')
-        self.state = 'Manual'
+        self.state = FlightState.MANUAL_FLIGHT
         self.standby_position = [self.position.x, self.position.y, self.position.z]
         self.standby_yaw = self.yaw
 
     def xy_consensus(self):
         logger.info(self.name + ' Switch to xy consensus mode')
-        self.state = 'xy_consensus'
+        self.state = FlightState.XY_CONSENSUS
         self.xy_consensus_z = self.position.z
 
     def z_consensus(self):
         logger.info(self.name + ' Switch to z consensus mode')
-        self.state = 'z_consensus'
+        self.state = FlightState.Z_CONSENSUS
         self.z_consensus_xy_position = [self.position.x, self.position.y]
 
     def back_to_initial_position(self):
         logger.info(self.name + ' Back to initial position')
-        self.state = 'Back_to_init'
+        self.state = FlightState.BACK_TO_INIT
         self.back_to_init_yaw = self.yaw
 
     def log_flight_data(self):
